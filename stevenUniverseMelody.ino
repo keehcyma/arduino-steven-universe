@@ -18,7 +18,7 @@ int mainThemeButtonState = 0;
  *
  * I hope you enjoy!
  */
-int mainThemeMelody[] = {
+short mainThemeMelody[] = {
   //If you're evil and you're on the rise
   NOTE_A3, NOTE_C4, NOTE_A3, NOTE_C4, NOTE_A3, NOTE_C4, NOTE_A3, NOTE_E4, NOTE_F4, NOTE_E4,
   //You can count on the four of us taking you down
@@ -103,7 +103,90 @@ int mainThemeMelody[] = {
   NOTE_B4, NOTE_A4, NOTE_G4, NOTE_A4, NOTE_G4, NOTE_DS4, NOTE_B4, NOTE_A4, NOTE_B4, NOTE_G4
 };
 
-int mainThemeNoteDurations[] = {
+short mainThemeActorNoteCounts[] = {
+  //Steven
+  96,
+  //None
+  96+21,
+  //Pearl
+  96+21+68,
+  //None
+  96+21+68+73,
+  //Garnet
+  96+21+68+73+20,
+  //Pearl
+  96+21+68+73+20+19,
+  //Amethyst
+  96+21+68+73+20+19+20,
+  //Steven
+  96+21+68+73+20+19+20+21,
+  //All
+  96+21+68+73+20+19+20+21+20,
+  // "We" 36
+  96+21+68+73+20+19+20+21+20+1,
+  // "Are the Crystal"
+  96+21+68+73+20+19+20+21+20+1+4,
+  // "Gems"
+  96+21+68+73+20+19+20+21+20+1+4+1,
+  // "We'll always save the day"
+  96+21+68+73+20+19+20+21+20+1+4+1+7,
+  // "And if you think we can't"
+  96+21+68+73+20+19+20+21+20+1+4+1+7+7,
+  // "We'll always find a way"
+  96+21+68+73+20+19+20+21+20+1+4+1+7+7+5,
+  // "That's why the people"
+  96+21+68+73+20+19+20+21+20+1+4+1+7+7+5+5,
+  // "of this world"
+  96+21+68+73+20+19+20+21+20+1+4+1+7+7+5+5+3,
+  // "believe in"
+  96+21+68+73+20+19+20+21+20+1+4+1+7+7+5+5+3+3,
+  // Garnet
+  96+21+68+73+20+19+20+21+20+1+4+1+7+7+5+5+3+3+2,
+  //Amethyst
+  96+21+68+73+20+19+20+21+20+1+4+1+7+7+5+5+3+3+2+3,
+  //Pearl
+  96+21+68+73+20+19+20+21+20+1+4+1+7+7+5+5+3+3+2+3+2,
+  //Steven
+  96+21+68+73+20+19+20+21+20+1+4+1+7+7+5+5+3+3+2+3+2+3
+};
+
+#define STEVEN_BIT   1<<0
+#define PEARL_BIT    1<<1
+#define AMETHYST_BIT 1<<2
+#define GARNET_BIT   1<<3
+
+byte mainThemeActorLEDEnables[] = {
+  // format xxxx - {garnet} {amethyst} {pearl} {steven}
+  // examples:
+  // 0b00000001 Steven Only
+  // 0b00001100 Garnet and Amethyst Only
+  // 0b00001111 Everybody
+  STEVEN_BIT,
+  0, // short interlude
+  PEARL_BIT,
+  0, //long bridge, could be fun to light up colors based on gems present in the full video /shrug
+  GARNET_BIT,
+  PEARL_BIT,
+  AMETHYST_BIT,
+  STEVEN_BIT,
+  STEVEN_BIT | PEARL_BIT | AMETHYST_BIT | GARNET_BIT,
+  GARNET_BIT,
+  PEARL_BIT | AMETHYST_BIT | GARNET_BIT,
+  STEVEN_BIT,
+  STEVEN_BIT | PEARL_BIT | AMETHYST_BIT | GARNET_BIT,
+  STEVEN_BIT,
+  STEVEN_BIT | PEARL_BIT | AMETHYST_BIT | GARNET_BIT,
+  GARNET_BIT,
+  STEVEN_BIT | PEARL_BIT | AMETHYST_BIT | GARNET_BIT,
+  GARNET_BIT,
+  GARNET_BIT,
+  AMETHYST_BIT,
+  PEARL_BIT,
+  STEVEN_BIT
+};
+
+
+byte mainThemeNoteDurations[] = {
   //If you're evil and you're on the rise
   4, 16, 16, 16, 16, 16, 16, 8, 16, 4,
   //You can count on the four of us taking you down
@@ -195,16 +278,40 @@ void setup() {
   pinMode(mainThemeButton, INPUT);
 }
 
+byte actorIndex = 0;
+inline void writeActorLEDs(int noteIndex, int noteFrequency)
+{
+  //made actorIndex static since it should always only increment as we work through the song
+  while (noteIndex >= mainThemeActorNoteCounts[actorIndex]) {
+    actorIndex = actorIndex + 1;
+  }
+  // Now we know who is supposed to be singing
+  byte singers = mainThemeActorLEDEnables[actorIndex] & (noteFrequency?0xFF:0); //if no one is singing, we'll turn off the LEDs
+  if (singers & GARNET_BIT)   digitalWrite(garnetLight, HIGH);
+  else                        digitalWrite(garnetLight, LOW);
+  if (singers & AMETHYST_BIT) digitalWrite(amethystLight, HIGH);
+  else                        digitalWrite(amethystLight, LOW);
+  if (singers & PEARL_BIT)    digitalWrite(pearlLight, HIGH);
+  else                        digitalWrite(pearlLight, LOW);
+  if (singers & STEVEN_BIT)   digitalWrite(stevenLight, HIGH);
+  else                        digitalWrite(stevenLight, LOW);
+}
+
 void loop(){
+  short startingNote = 0;
   mainThemeButtonState = digitalRead(mainThemeButton);
   if (mainThemeButtonState == HIGH) {
-    digitalWrite(garnetLight, HIGH);
+    delay(500); //see if the button is still held half a second later. If so, play the shorter intro.
+    mainThemeButtonState = digitalRead(mainThemeButton);
+    if (mainThemeButtonState == HIGH) startingNote = 96+21+68+73+20+19+20+21+20; //skip to the regular intro
+        digitalWrite(garnetLight, HIGH);
     digitalWrite(amethystLight, HIGH);
     digitalWrite(pearlLight, HIGH);
     digitalWrite(stevenLight, HIGH);
-    for (int thisNote = 0; thisNote < sizeof(mainThemeMelody)/sizeof(mainThemeMelody[0]); thisNote++) {
+    for (int thisNote = startingNote; thisNote < sizeof(mainThemeMelody)/sizeof(mainThemeMelody[0]); thisNote++) {
       int noteDuration = 2000 / mainThemeNoteDurations[thisNote];
       tone(buzzer, mainThemeMelody[thisNote], noteDuration);
+      writeActorLEDs(thisNote, mainThemeMelody[thisNote]);
       int pauseBetweenNotes = noteDuration * 1.25;
       delay(pauseBetweenNotes);
     }
@@ -214,5 +321,7 @@ void loop(){
     digitalWrite(pearlLight, LOW);
     digitalWrite(stevenLight, LOW);
   }
+  //reset our globals
   mainThemeButtonState = LOW;
+  actorIndex = 0;
 }
